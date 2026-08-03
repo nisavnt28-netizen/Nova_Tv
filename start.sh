@@ -6,7 +6,7 @@ if [ ! -f "data.db" ]; then
     apt-get update && apt-get install -y unrar wget
     
     echo "Downloading RAR file..."
-    wget "YAHAN_APNA_GOOGLE_DRIVE_DIRECT_LINK_DALEIN" -O data.rar
+    wget "https://drive.google.com/uc?export=download&id=19yUG5W5ea4SNkNTAIjsAnvRI_2yc2XVe" -O data.rar
     
     echo "Extracting RAR file..."
     unrar x -o+ data.rar
