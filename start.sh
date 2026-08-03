@@ -3,7 +3,7 @@
 # Agar data.db pehle se nahi bani hai, toh download karo
 if [ ! -f "data.db" ]; then
     echo "Downloading file from Google Drive..."
-    wget "https://drive.google.com/uc?export=download&id=1clGxV3xlKpGL_DBLYPPAtTjG6CbobkKj" -O downloaded_file
+    wget "https://drive.google.com/uc?export=download&id=1oly9xfhKoPE0_pMMqPSJROmzHYich4N6" -O downloaded_file
     
     # Check karo ki downloaded file DB hai ya CSV
     if grep -q "SQLite format 3" downloaded_file; then
