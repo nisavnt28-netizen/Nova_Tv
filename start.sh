@@ -1,19 +1,19 @@
 #!/bin/bash
 
-# Agar data.db pehle se nahi bani hai, toh CSV download karo
+# Agar data.db pehle se nahi bani hai, toh download karo
 if [ ! -f "data.db" ]; then
-    echo "Downloading CSV file from Google Drive..."
-    # Niche wali line mein apna Google Drive Direct Link dalo
-    wget "https://drive.google.com/uc?export=download&id=19yUG5W5ea4SNkNTAIjsAnvRI_2yc2XVe" -O data.csv
+    echo "Downloading file from Google Drive..."
+    wget "YAHAN_APNA_GOOGLE_DRIVE_DIRECT_LINK_DALEIN" -O downloaded_file
     
-    if [ -f "data.csv" ]; then
-        echo "Converting CSV to SQLite DB..."
-        python convert_db.py
-        
-        echo "Cleaning up space (Deleting CSV)..."
-        rm data.csv
+    # Check karo ki downloaded file DB hai ya CSV
+    if grep -q "SQLite format 3" downloaded_file; then
+        echo "Downloaded file is already a DB. Renaming to data.db..."
+        mv downloaded_file data.db
     else
-        echo "Error: data.csv could not be downloaded!"
+        echo "Downloaded file is CSV. Converting to DB..."
+        mv downloaded_file data.csv
+        python convert_db.py
+        rm data.csv # Space bachane ke liye CSV delete karo
     fi
 fi
 
