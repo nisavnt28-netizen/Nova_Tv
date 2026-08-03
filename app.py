@@ -2,14 +2,11 @@ from flask import Flask, request, jsonify, render_template_string
 import sqlite3
 import uuid
 import datetime
-import csv
 import os
-import subprocess
 
 app = Flask(__name__)
 DB_NAME = 'admin.db'
-UPLOAD_FOLDER = '.'  # Current folder se file read karega
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+DATA_DB = 'data.db' # Ye aapki 2GB ki file ka DB banega
 
 def init_db():
     conn = sqlite3.connect(DB_NAME)
@@ -34,7 +31,6 @@ HTML_DASHBOARD = '''
         h2 { color: #3fb950; border-bottom: 1px solid #30363d; padding-bottom: 10px; }
         input, select { width: 95%; padding: 12px; margin: 10px 0; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 5px; box-sizing: border-box; }
         button { background: #238636; color: white; border: none; padding: 12px; width: 95%; font-weight: bold; border-radius: 5px; cursor: pointer; box-sizing: border-box; }
-        button:hover { background: #2ea043; }
         .api-box { background: #0d1117; padding: 15px; margin: 10px 0; border-left: 4px solid #f778ba; border-radius: 5px; }
         .api-box b { color: #f778ba; }
         a { color: #58a6ff; text-decoration: none; }
@@ -43,17 +39,18 @@ HTML_DASHBOARD = '''
 <body>
     <h1>[ ITACHI API HUB ]</h1>
     <div class="card">
-        <h2>> Upload Database (.csv, .ac)</h2>
-        <form action="/upload" method="POST" enctype="multipart/form-data">
-            <input type="file" name="db_file" accept=".csv,.ac" required>
-            <button type="submit">[ INITIATE UPLOAD ]</button>
-        </form>
+        <h2>> Database Status</h2>
+        {% if db_exists %}
+        <p style="color: #3fb950;">✓ SQLite Database (data.db) Loaded Successfully!</p>
+        {% else %}
+        <p style="color: #f85149;">✗ Database Not Found. Please check start.sh logs.</p>
+        {% endif %}
     </div>
 
     <div class="card">
         <h2>> Configure New API</h2>
         <form action="/setup" method="GET">
-            <select name="file"><option value="">-- Select Database File --</option>{% for f in files %}<option value="{{ f }}">{{ f }}</option>{% endfor %}</select>
+            <input type="hidden" name="file" value="data.db">
             <button type="submit">[ PROCEED TO SETUP ]</button>
         </form>
     </div>
@@ -63,7 +60,6 @@ HTML_DASHBOARD = '''
         {% for api in apis %}
         <div class="api-box">
             <b>Endpoint:</b> /api/{{ api.key }}/{{ api.api_name }}/SEARCH_VALUE <br>
-            <b>Database:</b> {{ api.db_file }} <br>
             <b>Search By:</b> {{ api.search_column }} <br>
             <b>Expiry:</b> {{ api.expiry }}
         </div>
@@ -108,26 +104,19 @@ def dashboard():
     c.execute("SELECT * FROM api_keys")
     apis = c.fetchall()
     conn.close()
-    files = [f for f in os.listdir(UPLOAD_FOLDER) if f.endswith(('.csv', '.ac'))]
+    db_exists = os.path.exists(DATA_DB)
     api_list = [{'key': r[0], 'api_name': r[1], 'db_file': r[2], 'search_column': r[3], 'expiry': r[4]} for r in apis]
-    return render_template_string(HTML_DASHBOARD, files=files, apis=api_list)
-
-@app.route('/upload', methods=['POST'])
-def upload_file():
-    file = request.files['db_file']
-    filename = file.filename
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
-    file.save(filepath)
-    return "Upload successful! <a href='/'>Go Back</a>"
+    return render_template_string(HTML_DASHBOARD, db_exists=db_exists, apis=api_list)
 
 @app.route('/setup', methods=['GET'])
 def setup():
-    filename = request.args.get('file')
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
-    with open(filepath, mode='r', encoding='utf-8', errors='ignore') as f:
-        reader = csv.reader(f)
-        columns = next(reader)
-    return render_template_string(HTML_SETUP, file=filename, columns=columns)
+    # SQLite DB ke columns read kar rhe hain
+    conn = sqlite3.connect(DATA_DB)
+    c = conn.cursor()
+    c.execute("PRAGMA table_info(api_data)") # api_data table ka naam hai
+    columns = [row[1] for row in c.fetchall()]
+    conn.close()
+    return render_template_string(HTML_SETUP, file="data.db", columns=columns)
 
 @app.route('/generate', methods=['POST'])
 def generate():
@@ -148,6 +137,7 @@ def generate():
     
     return f"API Ready! <br>Key: {new_key} <br>Name: {api_name} <br><a href='/'>Dashboard par jao</a>"
 
+# --- ASLI API ENDPOINT (SQLite Search) ---
 @app.route('/api/<api_key>/<api_name>/<search_value>')
 def get_data(api_key, api_name, search_value):
     conn = sqlite3.connect(DB_NAME)
@@ -163,16 +153,23 @@ def get_data(api_key, api_name, search_value):
     if datetime.datetime.now().strftime('%Y-%m-%d') > expiry:
         return jsonify({"status": "error", "message": "API Key Expired", "dev": "ITACHI....."})
         
-    filepath = os.path.join(UPLOAD_FOLDER, db_file)
-    with open(filepath, mode='r', encoding='utf-8', errors='ignore') as f:
-        reader = csv.DictReader(f)
-        for r in reader:
-            db_val = str(r.get(search_col, '')).replace(" ", "").strip()
-            search_val_clean = search_value.replace(" ", "").strip()
-            if db_val == search_val_clean:
-                r["dev"] = "ITACHI....."
-                return jsonify({"status": "success", "data": r, "dev": "ITACHI....."})
-                
+    # SQLite Database mein search karenge ab (bahut fast hoga)
+    conn = sqlite3.connect(DATA_DB)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    
+    # Spaces hata kar search karenge taaki Aadhar number mil jaye
+    query = f'SELECT * FROM api_data WHERE REPLACE("{search_col}", " ", "") = ?'
+    c.execute(query, (search_value.replace(" ", "").strip(),))
+    
+    result = c.fetchone()
+    conn.close()
+    
+    if result:
+        data = dict(result)
+        data["dev"] = "ITACHI....."
+        return jsonify({"status": "success", "data": data, "dev": "ITACHI....."})
+        
     return jsonify({"status": "error", "message": "Record not found", "dev": "ITACHI....."}), 404
 
 if __name__ == '__main__':
