@@ -1,27 +1,19 @@
 #!/bin/bash
 
-# Agar data.db pehle se nahi bani hai, toh ye process karo
+# Agar data.db pehle se nahi bani hai, toh CSV download karo
 if [ ! -f "data.db" ]; then
-    echo "Installing required tools..."
-    apt-get update && apt-get install -y unrar wget
+    echo "Downloading CSV file from Google Drive..."
+    # Niche wali line mein apna Google Drive Direct Link dalo
+    wget "https://drive.google.com/uc?export=download&id=19yUG5W5ea4SNkNTAIjsAnvRI_2yc2XVe" -O data.csv
     
-    echo "Downloading RAR file..."
-    wget "https://drive.google.com/uc?export=download&id=19yUG5W5ea4SNkNTAIjsAnvRI_2yc2XVe" -O data.rar
-    
-    echo "Extracting RAR file..."
-    unrar x -o+ data.rar
-    
-    # Dhyan rahe: extract hone ke baad aapki CSV file ka naam 'data.csv' hona chahiye
-    # Agar naam alag hai, toh niche wali line mein naam change kar lein
     if [ -f "data.csv" ]; then
-        echo "Converting to SQLite DB..."
+        echo "Converting CSV to SQLite DB..."
         python convert_db.py
         
-        echo "Cleaning up space (Deleting RAR and CSV)..."
-        rm data.rar
+        echo "Cleaning up space (Deleting CSV)..."
         rm data.csv
     else
-        echo "Error: data.csv not found after extraction!"
+        echo "Error: data.csv could not be downloaded!"
     fi
 fi
 
