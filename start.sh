@@ -1,22 +1,19 @@
 #!/bin/bash
 
-# Agar data.db pehle se nahi bani hai, toh download karo
-if [ ! -f "data.db" ]; then
-    echo "Downloading file from Google Drive..."
-    wget "https://drive.google.com/uc?export=download&id=1oly9xfhKoPE0_pMMqPSJROmzHYich4N6" -O downloaded_file
-    
-    # Check karo ki downloaded file DB hai ya CSV
-    if grep -q "SQLite format 3" downloaded_file; then
-        echo "Downloaded file is already a DB. Renaming to data.db..."
-        mv downloaded_file data.db
-    else
-        echo "Downloaded file is CSV. Converting to DB..."
-        mv downloaded_file data.csv
-        python convert_db.py
-        rm data.csv # Space bachane ke liye CSV delete karo
-    fi
+# 1. Server start hote hi Hugging Face se data auto-sync karo
+echo "Auto-Syncing Databases from Hugging Face..."
+python -c "from sync_hf import sync_databases; print(sync_databases())"
+
+# 2. Agar koi .zip file download hui hai, toh usko unzip karo
+if ls *.zip 1> /dev/null 2>&1; then
+    echo "Extracting ZIP files..."
+    apt-get update && apt-get install -y unzip
+    for z in *.zip; do
+        unzip -o "$z"
+        rm "$z" # Unzip karne ke baad zip delete kar do space bachane ke liye
+    done
 fi
 
-# Server start karo
+# 3. Server start karo
 echo "Starting Gunicorn Server..."
 gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120 --workers 1
