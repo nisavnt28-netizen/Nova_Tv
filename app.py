@@ -206,7 +206,7 @@ def get_data(api_key, api_name, search_value):
         
     db_files_str, search_hint, expiry = row
     if datetime.datetime.now().strftime('%Y-%m-%d') > expiry:
-        return jsonify({"status": "error", "message": "API Key Expired", "dev": "ITACHI....."})
+        return jsonify({"status": "error", "message": "API Key Expired contact admin @ITACHI_UCHIHA_34", "dev": "ITACHI....."})
         
     db_files = [f.strip() for f in db_files_str.split(',')]
     search_val_clean = search_value.replace(" ", "").strip()
@@ -254,7 +254,6 @@ def get_data(api_key, api_name, search_value):
             if result:
                 data = dict(result)
                 data["dev"] = "ITACHI....."
-                data["found_in"] = db_file
                 data["matched_columns"] = target_cols
                 return jsonify({"status": "success", "data": data, "dev": "ITACHI....."})
                 
